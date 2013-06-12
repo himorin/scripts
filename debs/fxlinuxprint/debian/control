@@ -1,0 +1,15 @@
+Source: fxlinuxprint
+Section: text
+Priority: optional
+Maintainer: Fuji Xerox Co., Ltd. <>
+Standards-Version: 3.6.0
+
+Package: fxlinuxprint
+Section: text
+Priority: optional
+Architecture: amd64
+Depends: libc6 (>= 2.3.6-6), libcupsys2 (>= 1.2.7) | libcups2 (>= 1.2.7), cupsys (>= 1.2.7) | cups (>= 1.2.7), gs-esp | ghostscript
+Maintainer: Fuji Xerox Co., Ltd. <>
+Description: Fuji Xerox Printer Driver for Linux Ver1.0.4
+  This package is Fuji Xerox Printer Driver for Linux.
+

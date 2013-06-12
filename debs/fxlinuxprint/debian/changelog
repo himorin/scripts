@@ -1,0 +1,9 @@
+fxlinuxprint (1.0.4-1) unstable; urgency=low
+
+  * Made package from fxlinux distribution
+
+ -- Atsushi Shimono <shimono@bug-ja.org>  Tue, 11 Jun 2013 12:00:00 +0900
+
+Local variables:
+mode: debian-changelog
+End:
