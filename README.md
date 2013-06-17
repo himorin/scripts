@@ -7,4 +7,5 @@ personal use scripts
 * image : image tools
 * kusastro : used at Dept. Astronomy, Kyoto Univ.
 * debs : Debian package rules files
+* system : scripts for OS
 
