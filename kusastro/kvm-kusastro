@@ -1,0 +1,335 @@
+#! /usr/bin/perl
+
+# options
+# should add to 'sub print_help'
+
+use strict;
+
+# config file
+#  scheme: 'key=value' or 'VM diskimage entry'
+#  VM entry: hostname image=xxx mem=xxx ip_addr=xxx ....
+#  ip-addr must be the last number only (such as and = 1)
+my $kvm_conf = '/etc/oao378/kvmdisk.list';
+my $kvm_ifup = '/usr/share/kusastro-core/kvm-ifup-';
+
+# script global options
+my %gopt = (
+    kvm_dir     => '/kvm',
+    kvm_backup  => '/minet/kvm-backup',
+    kvm_var     => '/var/run/kvm-oao378',
+);
+# VM init options
+my %conf = (
+    image       => '',
+    mem         => 512,
+    ip_addr     => 0,
+    vnc         => 0,
+    mac         => '',
+    net_br      => 'br0',
+    boot        => 'c',
+    pid         => '',
+    smp         => 1,
+    kl          => 'ja',
+    rtc         => 'utc',
+);
+my $hostname = `/bin/hostname -s`;
+chomp($hostname);
+my $ret;
+
+my $kvmopt = '';
+my %opt;
+
+&parse_opt(\%opt, \@ARGV);
+if (! defined($opt{hostname})) {
+    &print_help;
+    exit;
+}
+if (defined($opt{conf})) {
+    if (! -f $opt{conf}) {
+        print "Error: Config file '$opt{conf}' not found.\n";
+        &print_help;
+        exit;
+    }
+    $kvm_conf = $opt{conf};
+}
+if (defined($ret = &parse_data(\%conf, \%gopt, $opt{hostname}))) {
+    print "$ret\n";
+    &print_help;
+    exit;
+}
+if ($conf{image} eq '')    {print "Config '$kvm_conf' error.\n"; &print_help; }
+if ($conf{ip_addr} eq 0)   {print "Config '$kvm_conf' error.\n"; &print_help; }
+if (! -d $gopt{kvm_dir}) {
+    print "KVM image directory '$gopt{kvm_dir}' not found.\n";
+    &print_help;
+    exit;
+}
+if (! -d $gopt{kvm_var}) {
+    print "/var/run directory '$gopt{kvm_var}' not found.\n";
+    system("mkdir -p $gopt{kvm_var}");
+    print "Created '$gopt{kvm_var}\n";
+}
+$gopt{kvm_backup} .= '/' . $hostname;
+if (! -d $gopt{kvm_backup}) {
+    print "KVM image backup directory '$gopt{kvm_backup}' not found.\n";
+    &print_help;
+    exit;
+}
+if (! -f ($gopt{kvm_dir} . '/' . $conf{image})) {
+    print "KVM image file '$conf{image}' not found.\n";
+    &print_help;
+    exit;
+}
+
+## KVM IMAGE BACKUP
+# $gopt{kvm_dir}/$conf{image} => $gopt{kvm_backup}/$conf{image}.YYYYMMDDHHMMSS
+if (! defined($opt{nobu})) {
+    print "Start backup KVM image file\n";
+    my @ltime = localtime(time);
+    my $backupto = $gopt{kvm_backup} . '/' . $conf{image} . '.';
+    $backupto .= ($ltime[5] + 1900) . (substr('0' . ($ltime[4] + 1), -2));
+    $backupto .= (substr('0' . $ltime[3], -2));
+    $backupto .= (substr('0' . $ltime[2], -2));
+    $backupto .= (substr('0' . $ltime[1], -2));
+    $backupto .= (substr('0' . $ltime[0], -2));
+    print "Backup to '$backupto'\n";
+    if (-f $backupto) {
+        print "Target file is already exist. Not backup-ed\n";
+    } else {
+        system("cp $gopt{kvm_dir}/$conf{image} $backupto");
+    }
+}
+
+## EXEC
+
+$conf{pid} = $gopt{kvm_var} . '/kvm-' . $opt{hostname} . '.pid';
+$kvmopt .= ' -pidfile ' . $conf{pid};
+$conf{vnc} = $conf{ip_addr};
+print "Using pid file: $conf{pid}\n";
+
+# opt override from %opt to %conf
+if (defined($opt{mac})) {
+    print "Override MAC addr with $opt{mac} ($conf{mac})\n";
+    $conf{mac} = $opt{mac};
+}
+if (defined($opt{disp}))    {$conf{vnc} = $opt{dip}; }
+if (defined($opt{kl}))      {$conf{kl} = $opt{kl}; }
+if (defined($opt{smp})) {
+    print "Using $opt{smp} CPU cores.\n";
+    $conf{smp} = $opt{smp};
+}
+if (defined($opt{rtc}))     {$conf{rtc} = $opt{rtc}; }
+
+# output virsh xml
+if (defined($opt{virxml})) {
+    &virsh_xml();
+    exit;
+}
+
+# start
+chdir($gopt{kvm_dir});
+
+$kvmopt .= ' -hda ' . $conf{image};
+$kvmopt .= ' -name ' . $hostname . '-' . $opt{hostname};
+$kvmopt .= ' -m ' . $conf{mem};
+$kvmopt .= ' -k ' . $conf{kl};
+
+if (defined($opt{hdb})) {
+  $kvmopt .= " -hdb $opt{hdb}";
+}
+if (defined($opt{cd})) {
+  $kvmopt .= ' -cdrom ' . $opt{cd};
+  $conf{boot} = 'd';
+}
+if (defined($conf{rtc})) {$kvmopt .= ' -rtc base=' . $conf{rtc}; }
+
+my $tap_id = 0;
+my $vlan_id = 0;
+my $ifup = '';
+if (index($conf{net_br}, ',') == -1) {
+  $ifup = $kvm_ifup . $conf{net_br};
+  if (defined($conf{mac}) && ($conf{mac} ne '')) {
+    while (! &canuse_tap_dev($tap_id)) {$tap_id += 1; }
+    $kvmopt .= ' -net nic,macaddr=' . $conf{mac} . ',model=e1000,vlan=0';
+    $kvmopt .= ' -net tap,vlan=0,ifname=tap' . $tap_id . ',script=' . $ifup;
+  } else {
+    print "Config for '$conf{net_br}' error.\n";
+    &print_help;
+  }
+} else {
+  my @arr_netbr = split(/,/, $conf{net_br});
+  foreach (@arr_netbr) {
+    $ifup = $kvm_ifup . $_;
+    while (! &canuse_tap_dev($tap_id)) {$tap_id += 1; }
+    if (defined($conf{'mac_' . $_}) && ($conf{'mac_' . $_} ne '')) {
+      while (! &canuse_tap_dev($tap_id)) {$tap_id += 1; }
+      $kvmopt .= ' -net nic,macaddr=' . $conf{'mac_' . $_};
+      $kvmopt .= ',model=e1000,vlan=' . $vlan_id;
+      $kvmopt .= ' -net tap,vlan=' . $vlan_id . ',ifname=tap' . $tap_id;
+      $kvmopt .= ',script=' . $ifup;
+    } else {
+      print "Config for '$conf{net_br}' error.\n";
+      &print_help;
+    }
+    $tap_id += 1;
+    $vlan_id += 1;
+  }
+}
+
+$kvmopt .= ' -smp ' . $conf{smp};
+$kvmopt .= ' -vnc :' . $conf{vnc};
+print 'Use VNC port : ' . ($conf{vnc} + 5900) . "\n";
+$kvmopt .= ' -daemonize';
+
+# exec
+my $cmd = "kvm $kvmopt -boot $conf{boot}";
+
+exec($cmd);
+
+exit;
+
+sub parse_data {
+    my ($kconf, $kopt, $hostname) = @_;
+    if (! -f $kvm_conf) {
+        return "Config file '$kvm_conf' not found.";
+    }
+    open(INDAT, $kvm_conf);
+    my @line;
+    foreach (<INDAT>) {
+        chomp;
+        if ($_ eq '') {next; }
+        if (substr($_, 0, 1) eq '#') {next; }
+        if ($_ =~ /^([a-zA-Z\-\_]+)\=(.*)$/) {
+            $kopt->{$1} = $2;
+            next;
+        }
+        @line = split(/[ \t]+/, $_);
+        if ($line[0] ne $hostname) {next; }
+        shift(@line);
+        foreach (@line) {
+            if ($_ =~ /([a-zA-Z0-9\-\_]+)\=(.*)$/) {
+                $kconf->{$1} = $2;
+            }
+        }
+    }
+    close(INDAT);
+    if ($kconf->{image} eq '') {
+       return "Config for host '$hostname' not found in '$kvm_conf'.";
+    }
+    return undef;
+}
+
+sub canuse_tap_dev {
+  my ($id) = (@_);
+  my $tapdir = '/proc/sys/net/ipv4/conf/tap' . $id;
+  if (-d $tapdir) {
+    return 0;
+  }
+  return 1;
+}
+
+sub parse_opt {
+  my ($opt, $arg) = (@_);
+  my $copt;
+  my @bat;
+  while ($copt = shift(@$arg)) {
+    if (substr($copt, 0, 1) eq '-') {
+      if (index($copt, ':') >= 0) {
+        @bat = split(/:/, substr($copt, 1));
+        $opt->{$bat[0]} = $bat[1];
+      } else {
+        $opt->{substr($copt, 1)} = '';
+      }
+    } else {
+      $opt->{hostname} = $copt;
+    }
+  }
+}
+
+sub print_help {
+  print <<__HELP_END
+Usage: kvm-kusastro (option) hostname
+Options for 'hostname' will be loaded from $kvm_conf (or set via -conf) file.
+
+Pre-defined options could be overrided by the following command line options
+  -mem:xxx   : memory size in MB (256)
+  -mac:xxxx  : MAC Address
+  -hdb:xxxx  : hdb disk image
+  -opt:xxxx  : other options (must not include ':')
+  -smp:x     : SMP CPU number
+  -cd:x      : CDROM image
+  -disp:xxx  : VNC display ID (default to ip addres)
+  -kl:xxx    : keyboard layout language (default to -ja)
+  -nobu      : Not backup image
+  -rtc:xxxx  : VM BIOS timezone (utc, localtime)
+  -conf:xxxx : Config file name (default is $kvm_conf)
+  -virxml    : output virsh xml
+__HELP_END
+}
+
+sub virsh_xml {
+    my $vnc = 5900 + $conf{vnc};
+    print <<__VXML_END;
+<domain type='kvm'>
+  <name>$opt{hostname}</name>
+  <memory>$conf{smp}</memory>
+  <currentMemory>$conf{mem}</currentMemory>
+  <vcpu>$conf{mem}</vcpu>
+  <os>
+    <type>hvm</type>
+    <boot dev='hd'/>
+    <boot dev='cdrom'/>
+  </os>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>restart</on_crash>
+  <features>
+    <acpi />
+    <apic />
+    <pae />
+  </features> 
+  <clock offset='$conf{rtc}'/>
+
+  <devices>
+    <emulator>/usr/bin/kvm</emulator>
+    <graphics type='vnc' port='$vnc' keymap='$conf{kl}'/>
+    <disk type='file' device='disk'>  
+      <driver name='qemu' type='raw'/>
+      <source file='$gopt{kvm_dir}/$conf{image}'/>
+      <target dev='hda' bus='ide'/>
+    </disk>
+    <disk type='file' device='cdrom'>
+      <driver name='qemu' type='raw' cache='none'/>
+      <readonly/>
+      <target dev='hdc'/>
+    </disk >
+    <input type='tablet' bus='usb'/>
+__VXML_END
+
+    if (index($conf{net_br}, ',') == -1) {
+        &print_netbrxml($conf{net_br}, $conf{mac}, 0);
+    } else {
+        my @arr_netbr = split(/,/, $conf{net_br});
+        my $id = 0;
+        foreach (@arr_netbr) {
+            &print_netbrxml($_, $conf{'mac_' . $_}, $id);
+            $id += 1;
+        }
+    }
+    print <<__END_XML2;
+  </devices>
+</domain>
+__END_XML2
+}
+
+sub print_netbrxml {
+    my ($netbr, $mac, $id) = @_;
+    print <<__END_NETBR;
+    <interface type='bridge'>
+      <source bridge='$netbr'/>
+      <mac address='$mac'/>
+      <target dev='vnet$id'/>  
+    </interface>
+__END_NETBR
+}
+
