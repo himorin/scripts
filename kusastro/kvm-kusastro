@@ -269,12 +269,13 @@ __HELP_END
 
 sub virsh_xml {
     my $vnc = 5900 + $conf{vnc};
+    my $mem = $conf{mem} * 1024;
     print <<__VXML_END;
 <domain type='kvm'>
   <name>$opt{hostname}</name>
-  <memory>$conf{smp}</memory>
-  <currentMemory>$conf{mem}</currentMemory>
-  <vcpu>$conf{mem}</vcpu>
+  <memory>$mem</memory>
+  <currentMemory>$mem</currentMemory>
+  <vcpu>$conf{smp}</vcpu>
   <os>
     <type>hvm</type>
     <boot dev='hd'/>
