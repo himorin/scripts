@@ -41,7 +41,7 @@ killtree() {
 
 stop() {
   echo "Stopping $DESC... "
-  if [ -f /var/run/NAME.pid ]; then
+  if [ -f /var/run/$NAME.pid ]; then
    while test -d /proc/$(cat /var/run/$NAME.pid); do
     killtree $(cat /var/run/$NAME.pid) 15
     sleep 0.5
