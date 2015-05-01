@@ -1,0 +1,123 @@
+#!/usr/bin/perl -w
+# -*- perl -*-
+
+=head1 NAME
+
+snmp__atenpdu_total - Munin plugin to monitor total usage of ATEN PN* PDU
+
+=head1 CONFIGURATION
+
+The following configuration variables are used
+
+ host      - SNMP host to contact (default taken from link name)
+ port      - SNMP port to use (default 161)
+ community - SNMP community string to use (default "public")
+
+=head1 LICENSE
+
+MPL/GPL
+
+=cut
+
+use strict;
+use Munin::Plugin::SNMP;
+
+use Data::Dumper;
+
+# oid
+my $oidPart      = '1.3.6.1.4.1.21317.1.3.2.30.2.1.1.0';
+my $oidDataBase  = '1.3.6.1.4.1.21317.1.3.2.30.2.2.2.1.1';
+my $oidDataCols  = { 2 => 'amp', 4 => 'watt' };
+my $oidAmp       = '1.3.6.1.4.1.21317.1.3.2.30.2.2.2.1.1.2.';
+my $oidWatt      = '1.3.6.1.4.1.21317.1.3.2.30.2.2.2.1.1.4.';
+my $oidNameBase  = '1.3.6.1.4.1.21317.1.3.2.30.2.2.2.10.1';
+my $oidNameCols  = { 2 => 'name' };
+my $oidName      = '1.3.6.1.4.1.21317.1.3.2.30.2.2.2.10.1.2.';
+
+if (defined $ARGV[0] and $ARGV[0] eq "snmpconf")
+{
+    print "require $oidPart\n";
+    exit 0;
+}
+
+my $session = Munin::Plugin::SNMP->session();
+my $partid = $session->get_single($oidPart);
+my $portnum = substr($partid, -2);
+my ($pid, $ret);
+
+if (defined $ARGV[0] and $ARGV[0] eq "config")
+{
+    my ($host) = Munin::Plugin::SNMP->config_session();
+    print "host_name $host\n";
+
+#    $ret = $session->get_hash( -baseoid => $oidNameBase, -cols => $oidNameCols);
+
+    my @hosts;
+    foreach (1 ... $portnum) {
+        $ret = &get_single($session, $oidName . $_);
+        if ((! defined($ret)) || ($ret eq "\0")) {$ret = 'Port ' . $_; }
+        push(@hosts, $ret);
+    }
+
+    print "multigraph amp\n";
+    print "graph_title PDU $partid port ampere usage\n";
+    print "graph_category system\n";
+    print "graph_vlabel Ampere [A]\n";
+    print "graph_info Port power usage\n";
+	print "graph_args --base 1000 -l 0\n";
+    foreach (1 ... $portnum) {
+        print "p$_.label \"" . $hosts[$_ - 1] . "\" Ampere [A]\n";
+    }
+    print "multigraph watt\n";
+    print "graph_title PDU $partid port watt usage\n";
+    print "graph_category system\n";
+    print "graph_vlabel Watt [W]\n";
+    print "graph_info Port power usage\n";
+	print "graph_args --base 1000 -l 0\n";
+    foreach (1 ... $portnum) {
+        print "p$_.label \"" . $hosts[$_ - 1] . "\" Watt [W]\n";
+    }
+
+    exit 0;
+}
+
+my $oval;
+
+#$ret = $session->get_hash( -baseoid => $oidDataBase, -cols => $oidDataCols );
+print "multigraph amp\n";
+foreach (1 ... $portnum) {
+    $ret = &get_single($session, $oidAmp . $_);
+    if ((! defined($ret)) || ($ret eq "\0")) {$ret = 'U'; }
+    else {$ret = substr($ret, 0, length($ret) - 1); }
+    print "p$_.value $ret\n";
+}
+print "multigraph watt\n";
+foreach (1 ... $portnum) {
+    $ret = &get_single($session, $oidWatt . $_);
+    if ((! defined($ret)) || ($ret eq "\0")) {$ret = 'U'; }
+    else {$ret = substr($ret, 0, length($ret) - 1); }
+    print "p$_.value $ret\n";
+}
+
+
+sub get_numeric {
+    my ($val) = @_;
+    if ($val =~ /^([0-9\.]+)/) {return $1; }
+    return undef;
+}
+
+sub get_single {
+    my ($session, $oid) = @_;
+    my $res = $session->get_request($oid);
+    my $val = undef;
+    if ($session->error_status) {return undef; }
+    # treat only if value returned, unless not touch $val
+    if (defined($res->{$oid})) {
+        if ($res->{$oid} ne 'noSuchObject') {$val = $res->{$oid}; }
+    } elsif (defined($res->{$oid . '.0'})) {
+        if ($res->{$oid . '.0'} ne 'noSuchObject') {$val = $res->{$oid . '.0'}; }
+    } else {
+    }
+    return $val;
+}
+
