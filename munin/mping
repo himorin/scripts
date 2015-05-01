@@ -1,0 +1,71 @@
+#! /usr/bin/perl
+
+=head1 NAME
+
+mping - Munin plugin to monitor ping responce time
+
+=head1 CONFIGURATION
+
+The following configuration variables are used
+
+ targets - array of targets connected with ","
+
+=head1 LICENSE
+
+MPL/GPL
+
+=cut
+
+use strict;
+
+my $env_targets;
+if (defined($ENV{targets})) {$env_targets = $ENV{targets}; }
+else {$env_targets = 'localhost'; }
+my @cnf_targets = split(/,/, $env_targets);
+
+my $cmd_ping = "/bin/ping -c 3 -W 1";
+my $cid;
+
+if (defined $ARGV[0] and $ARGV[0] eq 'autoconf') {
+    print "yes\n";
+    exit 0;
+}
+
+if (defined $ARGV[0] and $ARGV[0] eq "config")
+{
+    print "graph_title Network RTT (ping)\n";
+    print "graph_category network\n";
+    print "graph_vlabel RTT (msec)\n";
+    print "graph_info Ping RTT statistics\n";
+	print "graph_args --base 1000 -l 0\n";
+
+    foreach (0 ... $#cnf_targets) {
+        $cid = $_;
+        print "p${cid}_time.label RTT $cnf_targets[$cid]\n";
+        print "p${cid}_time.info Ping RTT avg for $cnf_targets[$cid]\n";
+        print "p${cid}_pl.label loss $cnf_targets[$cid]\n";
+        print "p${cid}_pl.info Packet loss for $cnf_targets[$cid] in %\n";
+    }
+    exit 0;
+}
+
+my ($cavg, $closs);
+
+foreach (0 ... $#cnf_targets) {
+    $cid = $_;
+    open(INCMD, "$cmd_ping $cnf_targets[$cid] |");
+    $cavg = 0; $closs = 0;
+    foreach (<INCMD>) {
+        if ($_ =~ m@min/avg/max.*\s\d+(?:\.\d+)?/(\d+(?:\.\d+)?)/\d+(?:\.\d+)?@) {
+            $cavg = $1;
+        } elsif ($_ =~ m@(\d+)% packet loss@) {
+            $closs = $1;
+        }
+    }
+    close(INCMD);
+    print "p${cid}_time.value $cavg\n";
+    print "p${cid}_pl.value $closs\n";
+}
+
+exit;
+
