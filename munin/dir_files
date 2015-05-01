@@ -1,0 +1,77 @@
+#! /usr/bin/perl
+
+=head1 NAME
+
+dir_files - Munin plugin to monitor file count in directory
+
+=head1 CONFIGURATION
+
+The following configuration variables are used
+
+ targets - array of targets connected with " " (white space)
+
+Warning and Critical thresholds could be attached with following ",", 
+like /tmp,1,10
+
+=head1 LICENSE
+
+MPL/GPL
+
+=cut
+
+use strict;
+
+my $env_targets;
+if (defined($ENV{targets})) {$env_targets = $ENV{targets}; }
+else {$env_targets = '/tmp'; }
+my @cnf_targets = split(/ /, $env_targets);
+
+my ($cid, @ctgt);
+
+if (defined $ARGV[0] and $ARGV[0] eq 'autoconf') {
+    print "yes\n";
+    exit 0;
+}
+
+if (defined $ARGV[0] and $ARGV[0] eq "config")
+{
+    print "graph_title Existing file count\n";
+    print "graph_category system\n";
+    print "graph_vlabel Files\n";
+    print "graph_info Files in directories\n";
+	print "graph_args --base 1000 -l 0\n";
+
+    foreach (0 ... $#cnf_targets) {
+        $cid = $_;
+        @ctgt = split(/,/, $cnf_targets[$cid]);
+        print "p${cid}_file.label Files $ctgt[0]\n";
+        print "p${cid}_file.info Files in $ctgt[0]\n";
+        print "p${cid}_dir.label Dirs $ctgt[0]\n";
+        print "p${cid}_dir.info Directories in $ctgt[0]\n";
+        if ($#ctgt > 1) {
+            print "p${cid}_file.warning $ctgt[1]\n";
+            print "p${cid}_file.critical $ctgt[2]\n";
+        }
+    }
+    exit 0;
+}
+
+my ($cfile, $cdir);
+
+foreach (0 ... $#cnf_targets) {
+    $cid = $_;
+    @ctgt = split(/,/, $cnf_targets[$cid]);
+    $cfile = 0; $cdir = 0;
+    opendir(DIR, $ctgt[0]) or next;
+    foreach (readdir(DIR)) {
+        next if (/^\.{1,2}$/);
+        if (-f "$ctgt[0]/$_") {$cfile = $cfile + 1; }
+        if (-d "$ctgt[0]/$_") {$cdir = $cdir + 1; }
+    }
+    closedir(DIR);
+    print "p${cid}_file.value $cfile\n";
+    print "p${cid}_dir.value $cdir\n";
+}
+
+exit;
+
