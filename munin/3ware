@@ -1,0 +1,139 @@
+#! /usr/bin/perl -w
+#
+# Plugin to monitor 3ware RAID status
+#
+# Parameters understood:
+#
+# 	config   (required)
+# 	autoconf (optional - used by munin-node-configure)
+#
+# Config variables:
+#
+#
+# Not supported:
+#
+#   suggest - not used
+#
+# Magic markers - optional - used by installation scripts and
+# munin-node-configure:
+#
+#%# family=auto
+#%# capabilities=autoconf suggest
+#
+
+# tw_cli show => ^cX
+# tw_cli /cX show => ^uX ^pX
+
+use strict;
+
+my $path_tw_cli = '/usr/sbin/tw_cli';
+my %status = (
+    'OK'             => 0,
+    'VERIFYING'      => 0,
+    'NOT-PRESENT'    => 1,
+    'INITIALIZING'   => 2,
+    'INIT-PAUSED'    => 3,
+    'REBUILDING'     => 4,
+    'REBUILD-PAUSED' => 5,
+    'DEGRADED'       => 6,
+    'MIGRATING'      => 7,
+    'MIGRATE-PAUSED' => 8,
+    'RECOVERY'       => 9,
+    'INOPERABLE'     => 10,
+    'UNKNOWN'        => 11,
+);
+
+# if status checker doesn't exist
+if ( ! -f $path_tw_cli ) {
+    exit 1;
+}
+
+# tw_cli exists, ok
+if ($ARGV[0] and $ARGV[0] eq "autoconf")
+{
+    print "yes\n";
+    exit 0;
+}
+
+my $status = &get_raid_status();
+
+if ($ARGV[0] and $ARGV[0] eq "config")
+{
+    print "graph_title 3ware RAID status\n";
+    print "graph_args --base 1000 -l 0\n";
+    print "graph_vlabel ID\n";
+    print "graph_scale no\n";
+    print "graph_category disk\n";
+    foreach (sort(keys(%$status))) {
+        print "$_.label $_\n";
+        print "$_.type GAUGE\n";
+        if (substr($_, -7) eq '_Status') {
+            print "$_.warning 2.0\n";
+        }
+    }
+    exit 0;
+}
+
+foreach (sort(keys(%$status))) {
+    print "$_.value $status->{$_}\n";
+}
+
+exit;
+
+sub get_raid_status {
+    my %ctl;
+    my %unit;
+    my %port;
+    my %ret;
+    open (CLI, "$path_tw_cli show |");
+    foreach (<CLI>) {
+        if ($_ =~ /^(c[0-9]*)/) {
+            $ctl{$1} = $_;
+        }
+    }
+    close(CLI);
+    foreach (keys(%ctl)) {
+        my $cctl = $_;
+        open (CLI, "$path_tw_cli /$cctl show |");
+        foreach (<CLI>) {
+            if ($_ =~ /^(u[0-9]*)/) {
+                $unit{$cctl . '_' . $1} = $_;
+            }
+            if ($_ =~ /^(p[0-9]*)/) {
+                $port{$cctl . '_' . $1} = $_;
+            }
+        }
+        close(CLI);
+    }
+    my $key;
+    my @line;
+    foreach (keys(%ctl)) {
+        $key = $_;
+        @line = split(/ +/, $ctl{$key});
+        $ret{$key . '_Drives'} = $line[3];
+        $ret{$key . '_Units'} = $line[4];
+        $ret{$key . '_NotOpt'} = $line[5];
+        $ret{$key . '_RRate'} = $line[6];
+        $ret{$key . '_VRate'} = $line[7];
+    }
+    foreach (keys(%unit)) {
+        $key = $_;
+        @line = split(/ +/, $unit{$key});
+        if (defined($status{$line[2]})) {
+            $ret{$key . '_Status'} = $status{$line[2]};
+        } else {
+            $ret{$key . '_Status'} = $status{'UNKNOWN'};
+        }
+    }
+    foreach (keys(%port)) {
+        $key = $_;
+        @line = split(/ +/, $port{$key});
+        if (defined($status{$line[1]})) {
+            $ret{$key . '_Status'} = $status{$line[1]};
+        } else {
+            $ret{$key . '_Status'} = $status{'UNKNOWN'};
+        }
+    }
+    return \%ret;
+}
+
