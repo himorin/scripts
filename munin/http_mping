@@ -22,9 +22,11 @@ use LWP::Protocol::https;
 use Time::HiRes qw( gettimeofday tv_interval );
 
 my $cmd_wget = '/usr/bin/wget';
-my $env_targets;
+my ($env_targets, $env_repeat);
 if (defined($ENV{targets})) {$env_targets = $ENV{targets}; }
 else {$env_targets = 'localhost=http://localhost/'; }
+if (defined($ENV{repeat})) {$env_repeat = $ENV{repeat}; }
+else {$env_repeat = 1; }
 my @cnf_targets = split(/,/, $env_targets);
 my ($cid, $cname, $curl);
 
@@ -56,8 +58,9 @@ if (defined $ARGV[0] and $ARGV[0] eq "config")
 }
 
 my $ua = LWP::UserAgent->new;
-my ($ts, $tv, $ua_out);
+my ($ts, $tv, $ua_out, @times);
 
+foreach (0 ... $env_repeat) {
 foreach (0 ... $#cnf_targets) {
     $cid = $_;
     $cname = substr($cnf_targets[$cid], 0, index($cnf_targets[$cid], '='));
@@ -66,7 +69,11 @@ foreach (0 ... $#cnf_targets) {
     $ua_out = $ua->get($curl);
     $tv = tv_interval($ts);
     if (! $ua_out->is_success) {$tv = 0; }
-    print "p$cid.value $tv\n";
+    $times[$cid] = $times[$cid] + $tv;
+}
+}
+foreach (0 ... $#cnf_targets) {
+    print "p$_.value " . $times[$_] / $env_repeat . "\n";
 }
 
 exit;
