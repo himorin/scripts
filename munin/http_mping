@@ -9,6 +9,8 @@ http_mping - Munin plugin to monitor HTTP request responce time
 The following configuration variables are used
 
  targets - array of targets in "name=http://target/" connected with ","
+ repeat  - repeat time to measure (default 1)
+ wait    - wait sec between repeats (default 2)
 
 =head1 LICENSE
 
@@ -22,11 +24,13 @@ use LWP::Protocol::https;
 use Time::HiRes qw( gettimeofday tv_interval );
 
 my $cmd_wget = '/usr/bin/wget';
-my ($env_targets, $env_repeat);
+my ($env_targets, $env_repeat, $env_wait);
 if (defined($ENV{targets})) {$env_targets = $ENV{targets}; }
 else {$env_targets = 'localhost=http://localhost/'; }
 if (defined($ENV{repeat})) {$env_repeat = $ENV{repeat}; }
 else {$env_repeat = 1; }
+if (defined($ENV{wait})) {$env_wait = $ENV{wait}; }
+else {$env_wait = 2; }
 my @cnf_targets = split(/,/, $env_targets);
 my ($cid, $cname, $curl);
 
@@ -61,6 +65,7 @@ my $ua = LWP::UserAgent->new;
 my ($ts, $tv, $ua_out, @times);
 
 foreach (0 ... $env_repeat) {
+    if ($_ ne 0) {sleep($env_wait); }
 foreach (0 ... $#cnf_targets) {
     $cid = $_;
     $cname = substr($cnf_targets[$cid], 0, index($cnf_targets[$cid], '='));
