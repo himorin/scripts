@@ -1,0 +1,163 @@
+#!/usr/bin/perl -w
+# -*- perl -*-
+
+=head1 NAME
+
+snmp__cisco_envmon - Munin plugin to monitor environment of cisco switch
+
+=head1 CONFIGURATION
+
+The following configuration variables are used
+
+ host      - SNMP host to contact (default taken from link name)
+ port      - SNMP port to use (default 161)
+ community - SNMP community string to use (default "public")
+
+=head1 LICENSE
+
+MPL/GPL
+
+=cut
+
+use strict;
+use Munin::Plugin::SNMP;
+
+# oid
+my $oidBase  = '1.3.6.1.4.1.9.9.13.1';
+
+if (defined $ARGV[0] and $ARGV[0] eq "snmpconf")
+{
+    print "require $oidBase [1-6]\n";
+    exit 0;
+}
+
+my $session = Munin::Plugin::SNMP->session();
+my (%info, $cid);
+my $oidCols = {
+    2 => {
+        'name' => 'Voltage',
+        'cols' => {
+            2 => 'description',
+            3 => 'value',
+            4 => 'low',
+            5 => 'high',
+            6 => 'lastshutdown',
+            7 => 'state',
+        }, },
+    3 => {
+        'name' => 'Temperature',
+        'cols' => {
+            2 => 'description',
+            3 => 'value',
+            4 => 'threshold',
+            5 => 'lastshutdown',
+            6 => 'state',
+        }, },
+    4 => {
+        'name' => 'Fan',
+        'cols' => {
+            2 => 'description',
+            3 => 'state',
+        }, },
+    5 => {
+        'name' => 'Supply',
+        'cols' => {
+            2 => 'description',
+            3 => 'state',
+            4 => 'source',
+        }, },
+};
+
+if (defined $ARGV[0] and $ARGV[0] eq "config")
+{
+    my ($host) = Munin::Plugin::SNMP->config_session();
+    print "host_name $host\n";
+    print "graph_title Cisco memory\n";
+    print "graph_category system\n";
+    print "graph_vlabel Byte\n";
+    print "graph_info Memory usage\n";
+	print "graph_args --base 1000 -l 0\n";
+
+    foreach my $envid (2 ... 5) {
+        %info = ();
+        if (&get_multi_composite($session, $oidBase . '.' . $envid . '.1', 
+                    $oidCols->{$envid}->{cols}, \%info) != 0) {
+            foreach (keys %info) {
+                $cid = "i${envid}_p${_}";
+                if (($envid == 2) || ($envid == 3)) {
+                    print "${cid}_value.label " . $info{$_}->{description} . "\n";
+                    print "${cid}_value.type GAUGE\n";
+                }
+                if ($envid == 2 ) {
+                    # how to do with low?
+                    print "${cid}_value.warning " . $info{$_}->{high}. "\n";
+                } elsif ($envid == 3) {
+                    print "${cid}_value.warning " . $info{$_}->{threshold}. "\n";
+                }
+                print "${cid}_state.label Status of " . $info{$_}->{description} . "\n";
+                print "${cid}_state.type GAUGE\n";
+                print "${cid}_state.warning 2\n";
+                print "${cid}_state.critical 3\n";
+            }
+        }
+    }
+    exit 0;
+}
+
+foreach my $envid (2 ... 5) {
+    %info = ();
+    if (&get_multi_composite($session, $oidBase . '.' . $envid . '.1', 
+                $oidCols->{$envid}->{cols}, \%info) != 0) {
+        foreach (keys %info) {
+            $cid = "i${envid}_p${_}";
+            if (($envid == 2) || ($envid == 3)) {
+                print "${cid}_value.value " . $info{$_}->{value} . "\n";
+            }
+            print "${cid}_state.value " . $info{$_}->{state} . "\n";
+        }
+    }
+}
+
+
+exit;
+
+sub get_multi_composite {
+    my ($session, $oidBase, $oidCols, $snmpinfo) = @_;
+    my $ret = $session->get_hash(
+            -baseoid => $oidBase,
+            -cols    => $oidCols);
+    if (! defined($ret)) {return 0; }
+    my ($ckey, $corig);
+    foreach $corig (keys %$ret) {
+        $corig =~ /(\d+)/;
+        $ckey = $1;
+        if (! defined($snmpinfo->{$ckey})) {$snmpinfo->{$ckey} = {}; }
+        foreach (keys %{$ret->{$corig}}) {
+            $snmpinfo->{$ckey}->{$_} = $ret->{$corig}->{$_};
+        }
+    }
+    return 1;
+}
+
+
+sub get_numeric {
+    my ($val) = @_;
+    if ($val =~ /^([0-9\.]+)/) {return $1; }
+    return undef;
+}
+
+sub get_single {
+    my ($session, $oid) = @_;
+    my $res = $session->get_request($oid);
+    my $val = undef;
+    if ($session->error_status) {return undef; }
+    # treat only if value returned, unless not touch $val
+    if (defined($res->{$oid})) {
+        if ($res->{$oid} ne 'noSuchObject') {$val = $res->{$oid}; }
+    } elsif (defined($res->{$oid . '.0'})) {
+        if ($res->{$oid . '.0'} ne 'noSuchObject') {$val = $res->{$oid . '.0'}; }
+    } else {
+    }
+    return $val;
+}
+
