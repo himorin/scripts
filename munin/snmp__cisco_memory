@@ -22,8 +22,6 @@ MPL/GPL
 use strict;
 use Munin::Plugin::SNMP;
 
-use Data::Dumper;
-
 # oid
 my $oidBase  = '1.3.6.1.4.1.9.9.48.1.1.1';
 my $memtype = {
