@@ -1,0 +1,160 @@
+#!/usr/bin/perl -w
+# -*- perl -*-
+
+=head1 NAME
+
+snmp__cisco_cpu - Munin plugin to monitor CPU usage of cisco switch
+
+=head1 CONFIGURATION
+
+The following configuration variables are used
+
+ host      - SNMP host to contact (default taken from link name)
+ port      - SNMP port to use (default 161)
+ community - SNMP community string to use (default "public")
+
+=head1 LICENSE
+
+MPL/GPL
+
+=cut
+
+use strict;
+use Munin::Plugin::SNMP;
+
+# oid
+my $oidBase  = '1.3.6.1.4.1.9.9.109.1.1.1.1';
+
+if (defined $ARGV[0] and $ARGV[0] eq "snmpconf")
+{
+    print "require $oidBase [1-11]\n";
+    exit 0;
+}
+
+my $session = Munin::Plugin::SNMP->session();
+my (%info, $cid);
+my $oidCols = {
+                1 => 'index',
+                2 => 'physicalindex',
+                3 => 'total5sec',
+                4 => 'total1min',
+                5 => 'total5min',
+                6 => 'total5secrev',
+                7 => 'total1minrev',
+                8 => 'total5minrev',
+                9 => 'moninterval',
+                10 => 'totalmoninterval',
+                11 => 'interruptmoninterval',
+};
+
+if (defined $ARGV[0] and $ARGV[0] eq "config")
+{
+    my ($host) = Munin::Plugin::SNMP->config_session();
+    print "host_name $host\n";
+    print "graph_title Cisco memory\n";
+    print "graph_category system\n";
+    print "graph_vlabel Byte\n";
+    print "graph_info Memory usage\n";
+	print "graph_args --base 1000 -l 0\n";
+
+    if (&get_multi_composite($session, $oidBase, $oidCols, \%info) != 0) {
+        foreach (keys %info) {
+            if (defined($info{$_}->{totalmoninterval}) &&
+                defined($info{$_}->{moninterval})) {
+                print "i${_}_5sec.label " . "CPU busy in last " . $info{$_}->{moninterval} . "sec\n";
+                print "i${_}_5sec.type GAUGE\n";
+            } elsif (defined($info{$_}->{total5secrev}) ||
+                     defined($info{$_}->{total5sec})) {
+                print "i${_}_5sec.label " . "CPU busy in last 5sec\n";
+                print "i${_}_5sec.type GAUGE\n";
+            }
+            if (defined($info{$_}->{interruptmoninterval}) &&
+                defined($info{$_}->{moninterval})) {
+                print "i${_}_interrupt.label " . "CPU interrupt in last " . $info{$_}->{moninterval} . "sec\n";
+                print "i${_}_interrupt.type GAUGE\n";
+            }
+            if (defined($info{$_}->{total1minrev}) ||
+                defined($info{$_}->{total1min})) {
+                print "i${_}_1min.label " . "CPU busy in last 1min\n";
+                print "i${_}_1min.type GAUGE\n";
+            }
+            if (defined($info{$_}->{total5minrev}) ||
+                defined($info{$_}->{total5min})) {
+                print "i${_}_5min.label " . "CPU busy in last 5min\n";
+                print "i${_}_5min.type GAUGE\n";
+            }
+        }
+    }
+    exit 0;
+}
+
+if (&get_multi_composite($session, $oidBase, $oidCols, \%info) != 0) {
+    foreach (keys %info) {
+        if (defined($info{$_}->{totalmoninterval}) &&
+            defined($info{$_}->{moninterval})) {
+            print "i${_}_5sec.value " . $info{$_}->{totalmoninterval} . "\n";
+        } elsif (defined($info{$_}->{total5secrev})) {
+            print "i${_}_5sec.value " . $info{$_}->{total5secrev} . "\n";
+        } elsif (defined($info{$_}->{total5sec})) {
+            print "i${_}_5sec.value " . $info{$_}->{total5sec} . "\n";
+        }
+        if (defined($info{$_}->{interruptmoninterval}) &&
+            defined($info{$_}->{moninterval})) {
+            print "i${_}_interrupt.value " . $info{$_}->{interruptmoninterval} . "\n";
+        }
+        if (defined($info{$_}->{total1minrev})) {
+            print "i${_}_1min.value " . $info{$_}->{total1minrev} . "\n";
+        } elsif (defined($info{$_}->{total1min})) {
+            print "i${_}_1min.value " . $info{$_}->{total1min} . "\n";
+        }
+        if (defined($info{$_}->{total5minrev})) {
+            print "i${_}_5min.value " . $info{$_}->{total5minrev} . "\n";
+        } elsif (defined($info{$_}->{total5min})) {
+            print "i${_}_5min.value " . $info{$_}->{total5min} . "\n";
+        }
+    }
+}
+
+
+exit;
+
+sub get_multi_composite {
+    my ($session, $oidBase, $oidCols, $snmpinfo) = @_;
+    my $ret = $session->get_hash(
+            -baseoid => $oidBase,
+            -cols    => $oidCols);
+    if (! defined($ret)) {return 0; }
+    my ($ckey, $corig);
+    foreach $corig (keys %$ret) {
+        $corig =~ /(\d+)/;
+        $ckey = $1;
+        if (! defined($snmpinfo->{$ckey})) {$snmpinfo->{$ckey} = {}; }
+        foreach (keys %{$ret->{$corig}}) {
+            $snmpinfo->{$ckey}->{$_} = $ret->{$corig}->{$_};
+        }
+    }
+    return 1;
+}
+
+
+sub get_numeric {
+    my ($val) = @_;
+    if ($val =~ /^([0-9\.]+)/) {return $1; }
+    return undef;
+}
+
+sub get_single {
+    my ($session, $oid) = @_;
+    my $res = $session->get_request($oid);
+    my $val = undef;
+    if ($session->error_status) {return undef; }
+    # treat only if value returned, unless not touch $val
+    if (defined($res->{$oid})) {
+        if ($res->{$oid} ne 'noSuchObject') {$val = $res->{$oid}; }
+    } elsif (defined($res->{$oid . '.0'})) {
+        if ($res->{$oid . '.0'} ne 'noSuchObject') {$val = $res->{$oid . '.0'}; }
+    } else {
+    }
+    return $val;
+}
+
