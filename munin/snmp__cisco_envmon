@@ -72,10 +72,10 @@ if (defined $ARGV[0] and $ARGV[0] eq "config")
 {
     my ($host) = Munin::Plugin::SNMP->config_session();
     print "host_name $host\n";
-    print "graph_title Cisco memory\n";
+    print "graph_title Cisco environment monitor\n";
     print "graph_category system\n";
-    print "graph_vlabel Byte\n";
-    print "graph_info Memory usage\n";
+    print "graph_vlabel Value\n";
+    print "graph_info environment monitor\n";
 	print "graph_args --base 1000 -l 0\n";
 
     foreach my $envid (2 ... 5) {
