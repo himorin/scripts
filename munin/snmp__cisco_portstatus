@@ -99,15 +99,15 @@ if (&get_multi_composite($session, $oidBase, $oidCols, \%info) != 0) {
     }
     print "multigraph if_speed\n";
     foreach (@iflist) {
-        print "${_}.value $info{$_}->{speed}\n";
+        print "i${_}.value $info{$_}->{speed}\n";
     }
     print "multigraph if_admstat\n";
     foreach (@iflist) {
-        print "${_}.value $info{$_}->{admstatus}\n";
+        print "i${_}.value $info{$_}->{admstatus}\n";
     }
     print "multigraph if_operstat\n";
     foreach (@iflist) {
-        print "${_}.value $info{$_}->{operstatus}\n";
+        print "i${_}.value $info{$_}->{operstatus}\n";
     }
 }
 
