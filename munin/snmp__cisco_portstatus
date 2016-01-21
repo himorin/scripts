@@ -45,47 +45,69 @@ if (defined $ARGV[0] and $ARGV[0] eq "config")
 {
     my ($host) = Munin::Plugin::SNMP->config_session();
     print "host_name $host\n";
-    print "graph_title Cisco Port status\n";
-    print "graph_category system\n";
-    print "graph_vlabel %\n";
-    print "graph_info Port status\n";
-	print "graph_args --base 1000 -l 0\n";
 
     my $name;
+    my %ifhash;
     if (&get_multi_composite($session, $oidBase, $oidCols, \%info) != 0) {
         foreach (keys %info) {
             if (defined($info{$_}->{name}) &&
                 (defined($info{$_}->{type}) && $info{$_}->{type} == 6)) {
-                $name = $info{$_}->{name};
-                print "i${_}_speed.label $name Link speed in exp10 Mbps\n";
-                print "i${_}_speed.type GAUGE\n";
-                print "i${_}_admstat.label $name Admin status\n";
-                print "i${_}_admstat.type GAUGE\n";
-                print "i${_}_operstat.label $name Operational status\n";
-                print "i${_}_operstat.type GAUGE\n";
+                $ifhash{$_} = $info{$_}->{name};
             }
+        }
+        print "multigraph if_speed\n";
+        print "graph_title Cisco port link speed\n";
+        print "graph_category network\n";
+        print "graph_vlabel Mbps\n";
+        print "graph_info Link speed per port\n";
+        print "graph_args --base 1000 --logarithmic\n";
+        foreach (sort keys %ifhash) {
+            print "i${_}.label $ifhash{$_}\n";
+            print "i${_}.type GAUGE\n";
+        }
+        print "multigraph if_admstat\n";
+        print "graph_title Cisco port admin status\n";
+        print "graph_category network\n";
+        print "graph_vlabel ID\n";
+        print "graph_info Admin status per port: 1) up 2) down 3) testing 4) unknown 5) dormant 6) not present 7) L1 down\n";
+        print "graph_args --base 1000 -l 0\n";
+        foreach (sort keys %ifhash) {
+            print "i${_}.label $ifhash{$_}\n";
+            print "i${_}.type GAUGE\n";
+        }
+        print "multigraph if_operstat\n";
+        print "graph_title Cisco port operational status\n";
+        print "graph_category network\n";
+        print "graph_vlabel ID\n";
+        print "graph_info Operational status per port: 1) up 2) down 3) testing 4) unknown 5) dormant 6) not present 7) L1 down\n";
+        print "graph_args --base 1000 -l 0\n";
+        foreach (sort keys %ifhash) {
+            print "i${_}.label $ifhash{$_}\n";
+            print "i${_}.type GAUGE\n";
         }
     }
     exit 0;
 }
 
-#                2 => 'name',
-#                5 => 'speed',
-#                7 => 'admstatus',
-#                8 => 'operstatus',
 if (&get_multi_composite($session, $oidBase, $oidCols, \%info) != 0) {
+    my @iflist;
     foreach (keys %info) {
         if (defined($info{$_}->{name}) &&
             (defined($info{$_}->{type}) && $info{$_}->{type} == 6)) {
-            if (($info{$_}->{speed} > 0) &&
-                (log($info{$_}->{speed})/log(10) > 6)) {
-                print "i${_}_speed.value " . (log($info{$_}->{speed})/log(10) - 6) . "\n";
-            } else {
-                print "i${_}_speed.value 0\n";
-            }
-            print "i${_}_admstat.value " . $info{$_}->{admstatus} . "\n";
-            print "i${_}_operstat.value " . $info{$_}->{operstatus} . "\n";
+            push(@iflist, $_);
         }
+    }
+    print "multigraph if_speed\n";
+    foreach (@iflist) {
+        print "${_}.value $info{$_}->{speed}\n";
+    }
+    print "multigraph if_admstat\n";
+    foreach (@iflist) {
+        print "${_}.value $info{$_}->{admstatus}\n";
+    }
+    print "multigraph if_operstat\n";
+    foreach (@iflist) {
+        print "${_}.value $info{$_}->{operstatus}\n";
     }
 }
 
