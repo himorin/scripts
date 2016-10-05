@@ -47,18 +47,20 @@ Text markup
 
 ::
 
- two \: with heading white space text will be taken as literal block
+ paragraph headed with two \: and heading white space text 
+ will be taken as literal block
 
 >>> leading three \> will be quote
 
  or text with space will be quote
 
+Text can be breaked into lines with leading \| like
+| this is breaked line.
+
 Tables
 ======
 
-+--+--+--+
-| table | is by | bar |
-| heading bar | cannot | be removed |
++-------+-------+----------+
+| table | is by | bar      |
+| but   | not   | flexible |
 
-Text can be breaked into lines with leading \| like
-| this is breaked line.
