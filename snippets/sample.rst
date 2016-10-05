@@ -46,17 +46,19 @@ Text markup
 - escape by \\ as \`
 
 ::
+
  two \: with heading white space text will be taken as literal block
 
-> leading \> will be quote
+>>> leading three \> will be quote
 
  or text with space will be quote
 
 Tables
 ======
 
++--+--+--+
 | table | is by | bar |
-heading bar | cannot | be removed
+| heading bar | cannot | be removed |
 
 Text can be breaked into lines with leading \| like
 | this is breaked line.
