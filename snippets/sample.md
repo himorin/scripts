@@ -18,8 +18,8 @@ header continues to h6.
 + unordered list by +
 * unordered list by *
   1. ordered list at second order by number with .
-  * unordered list at second order
-  can have contents with indented
+  * list at second order can have contents with indented
+  but ordered or unordered is fixed.
 * list continues
 
 Also can be listed as task lists
@@ -54,6 +54,6 @@ text is highlighted if without language definition
 | --- | --- |
 | 1 | test length is not matter |
 | 2 | just need to have the same number of components |
-leading | tailing pipe is not required?
+leading | tailing pipe is not required
 
 
