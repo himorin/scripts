@@ -25,11 +25,11 @@ definition
 also phrase
   is posslbe for definition
 
-:colon
+:colon:
   will be rendered as small table
 
-:can continue
-  even with line break in between
+:can continue:
+  even with line break in between, tailing \: is required
 
 -a  command help is displayed as this
 -b  with continued list
@@ -45,4 +45,18 @@ Text markup
 - numbered footnote reference is by `[x]_`
 - escape by \\ as \`
 
+::
+ two \: with heading white space text will be taken as literal block
 
+> leading \> will be quote
+
+ or text with space will be quote
+
+Tables
+======
+
+| table | is by | bar |
+heading bar | cannot | be removed
+
+Text can be breaked into lines with leading \| like
+| this is breaked line.
