@@ -54,8 +54,9 @@ Text markup
 
  or text with space will be quote
 
-Text can be breaked into lines with leading \| like
-| this is breaked line.
+| Text can be breaked into lines with leading \| like
+| this is breaked line, but need to start with leading \| from 
+  beginning of paragraph.
 
 Tables
 ======
