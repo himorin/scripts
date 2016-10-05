@@ -16,7 +16,7 @@ Listing
   with leading spaces
 * leading one can be * or + with space
 + this is with +, but using different heading charactor makes another list
-  + second order is not possible
+  + second order is not possible, just displaied as continuous text
 1. ordered list is by leading number
 #. continuous number will be assigned automatically with #
 
@@ -62,6 +62,7 @@ Tables
 
 +-------+-------+----------+
 | table | is by | bar      |
++=======+=======+==========+
 | but   | not   | flexible |
 +-------+-------+----------+
 
