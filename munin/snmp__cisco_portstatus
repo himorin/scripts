@@ -59,7 +59,7 @@ if (defined $ARGV[0] and $ARGV[0] eq "config")
             if (defined($info{$_}->{name}) &&
                 (defined($info{$_}->{type}) && $info{$_}->{type} == 6)) {
                 if (defined($infov2{$_}) && defined($infov2{$_}->{alias}) &&
-                    ($infov2{$_} ne '')) {
+                    ($infov2{$_}->{alias} ne '')) {
                     $ifhash{$_} = $infov2{$_}->{alias} . " (if $_)";
                 } else {
                     $ifhash{$_} = $info{$_}->{name};
