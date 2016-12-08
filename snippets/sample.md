@@ -18,6 +18,7 @@ header continues to h6.
 + unordered list by +
 * unordered list by *
   1. ordered list at second order by number with .
+    * third order will be shown as this
   * list at second order can have contents with indented
   but ordered or unordered is fixed.
 * list continues
