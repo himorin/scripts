@@ -30,8 +30,8 @@ Also can be listed as task lists
 ## link
 
 [link text](http://pfs.ipmu.jp PFS web site) with title in A.
-[Also reference is possible][1]
-[In repo link](/sample.rst)
+[Also reference is possible][1].
+[In repo link is from top of repo](/snippets/sample.rst)
 
 [1]: http://pfs.ipmu.jp
 
