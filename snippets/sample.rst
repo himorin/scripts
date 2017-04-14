@@ -16,8 +16,11 @@ Listing
   with leading spaces
 * leading one can be * or + with space
 + this is with +, but using different heading charactor makes another list
-  + second order is not possible, just displaied as continuous text
+
+  + second order is possible, but need to place blank line before and after
+
     + leading 4 spaces does not change.
+
 1. ordered list is by leading number
 #. continuous number will be assigned automatically with #
 
