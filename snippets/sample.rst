@@ -19,7 +19,7 @@ Listing
 
   + second order is possible, but need to place blank line before and after
 
-    + leading 4 spaces does not change.
+    + Adding leading spaces will make deeper orders
 
 1. ordered list is by leading number
 #. continuous number will be assigned automatically with #
