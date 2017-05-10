@@ -1,0 +1,194 @@
+#! /usr/bin/perl
+
+# MegaRAID munin plugin
+# Configure "user root" in plugin-conf.d/munin-node
+#
+# Option
+#   script link with target adapter ID, like megaraid_0
+#   env.clicmd for full path of megacli, normally not required (in PATH)
+
+use strict;
+
+my $CmdMain = "megacli";
+my $CmdGOpt = "-NoLog";
+my $CmdLDNum = "-LDGetNum -A";
+my $CmdPDNum = "-PDGetNum -A";
+my $CmdPDList = "-PDList -A";
+my $CmdLDInfo = "-LDInfo -lALL -A";
+
+my $RetLDNum = 'Number of Virtual Drives Configured on Adapter';
+my $RetLDInfoHead = 'Virtual Drive: ([0-9]+) \(Target Id: ([0-9]+)\)';
+my $RetPDNum = 'Number of Physical Drives on Adapter';
+my $RetPDListHead = '(Enclosure Device ID)\s*:\s*([0-9]+)';
+my $RetInfo = '^\s*(.*?)\s*:\s*(.*)\s*$';
+
+my $valVDState = { 'Optimal' => 0 };
+
+my $cnfAdp = 0; # default to 0
+if ($0 =~ /megaraid\_([0-9])$/) {
+    $cnfAdp = $1;
+}
+
+if ($ARGV[0] and $ARGV eq 'autoconf') {
+    print 'yes\n';
+    exit 0;
+}
+my $pdcnf = &GetPD();
+my $ldcnf = &GetLD();
+
+if ($ARGV[0] and $ARGV[0] eq 'config') {
+    print <<"__EOF__";
+multigraph megaraid_$cnfAdp.vdstate
+graph_title MegaRAID Adp $cnfAdp Virtual Drive status
+graph_scale no
+graph_vlabel Status
+graph_category disk
+__EOF__
+    foreach (@$ldcnf) {
+        print <<"__EOF__";
+vd$_->{drive}_drives.label VD $_->{drive} drives
+vd$_->{drive}_drives.type GAUGE
+vd$_->{drive}_state.label VD $_->{drive} state
+vd$_->{drive}_state.type GAUGE
+__EOF__
+    }
+    print <<"__EOF__";
+multigraph megaraid_$cnfAdp.failure
+graph_title MegaRAID Adp $cnfAdp Physical Drive status
+graph_scale no
+graph_vlabel Failure count
+graph_category disk
+__EOF__
+    foreach (@$pdcnf) {
+        print <<"__EOF__";
+pd$_->{'slot number'}_media.label PD $_->{'slot number'} media error
+pd$_->{'slot number'}_media.type GAUGE
+pd$_->{'slot number'}_other.label PD $_->{'slot number'} other error
+pd$_->{'slot number'}_other.type GAUGE
+pd$_->{'slot number'}_predictive.label PD $_->{'slot number'} predictive failure
+pd$_->{'slot number'}_predictive.type GAUGE
+pd$_->{'slot number'}_smart.label PD $_->{'slot number'} SMART
+pd$_->{'slot number'}_smart.type GAUGE
+pd$_->{'slot number'}_smart.warning 1
+__EOF__
+    }
+    print <<"__EOF__";
+multigraph megaraid_$cnfAdp.pdpos
+graph_title MegaRAID Adp $cnfAdp Physical Drive position
+graph_scale no
+graph_vlabel Position ID
+graph_category disk
+__EOF__
+    foreach (@$pdcnf) {
+        print <<"__EOF__";
+pd$_->{'slot number'}_group.label PD $_->{'slot number'} disk group
+pd$_->{'slot number'}_group.type GAUGE
+pd$_->{'slot number'}_span.label PD $_->{'slot number'} span
+pd$_->{'slot number'}_span.type GAUGE
+pd$_->{'slot number'}_arm.label PD $_->{'slot number'} arm
+pd$_->{'slot number'}_arm.type GAUGE
+__EOF__
+    }
+    exit 0;
+}
+
+# START PRINT
+
+my $cval;
+print "multigraph megaraid_$cnfAdp.vdstate\n";
+foreach (@$ldcnf) {
+    print "vd$_->{drive}_drives.value $_->{'number of drives'}\n";
+    if (defined($valVDState->{$_->{state}})) {$cval = $valVDState->{$_->{state}}; }
+    else {$cval = -1; }
+    print "vd$_->{drive}_state.value $cval\n";
+}
+
+print "multigraph megaraid_$cnfAdp.failure\n";
+foreach (@$pdcnf) {
+    print "pd$_->{'slot number'}_media.value $_->{'media error count'}\n";
+    print "pd$_->{'slot number'}_other.value $_->{'other error count'}\n";
+    print "pd$_->{'slot number'}_predictive.value $_->{'predictive failure count'}\n";
+    if (lc($_->{'drive has flagged a s.m.a.r.t alert'}) eq 'no') {$cval = 0; }
+    else {$cval = 1; }
+    print "pd$_->{'slot number'}_smart.value $cval\n";
+}
+
+print "multigraph megaraid_$cnfAdp.pdpos\n";
+foreach (@$pdcnf) {
+    $_->{'drive\'s position'} =~ /DiskGroup: ([0-9]+), Span: ([0-9]+), Arm: ([0-9]+)/i;
+    print "pd$_->{'slot number'}_group.value $1\n";
+    print "pd$_->{'slot number'}_span.value $2\n";
+    print "pd$_->{'slot number'}_arm.value $3\n";
+}
+
+exit;
+
+
+sub GetPD {
+    my ($pdnum, @pdcnf);
+    open(PDNUM, "$CmdMain $CmdPDNum$cnfAdp $CmdGOpt | ");
+    foreach (<PDNUM>) {
+        chomp;
+        if ($_ =~ /$RetPDNum .*:\s+([0-9]+)/i) {$pdnum = $1; }
+    }
+    close(PDNUM);
+    my $curPD = undef;
+    my $curNL = 0;
+    open(PDLIST, "$CmdMain $CmdPDList$cnfAdp $CmdGOpt | ");
+    foreach (<PDLIST>) {
+        chomp;
+        if (defined($curPD)) {
+            if ($_ =~ /$RetInfo/) {
+                $curPD->{lc($1)} = $2;
+                $curNL = 0;
+            } else {
+                $curNL += 1;
+                if ($curNL > 1) {
+                    push(@pdcnf, $curPD);
+                    $curPD = undef;
+                }
+            }
+        } else {
+            if ($_ =~ /$RetPDListHead/) {
+                $curPD = {};
+                $curNL = 0;
+                $curPD->{lc($1)} = $2;
+            }
+        }
+    }
+    close(PDLIST);
+    if ($#pdcnf != ($pdnum - 1)) {print "PD number mismatch\n"; }
+    return \@pdcnf;
+}
+
+sub GetLD {
+    my ($ldnum, @ldcnf);
+    open(LDNUM, "$CmdMain $CmdLDNum$cnfAdp $CmdGOpt | ");
+    foreach (<LDNUM>) {
+        chomp;
+        if ($_ =~ /$RetLDNum .*:\s+([0-9]+)/i) {$ldnum = $1; }
+    }
+    close(LDNUM);
+    my $curLD = undef;
+    open(LDINFO, "$CmdMain $CmdLDInfo$cnfAdp $CmdGOpt | ");
+    foreach (<LDINFO>) {
+        chomp;
+        if (defined($curLD)) {
+            if ($_ =~ /$RetInfo/) {
+                $curLD->{lc($1)} = $2;
+            } else {
+                push(@ldcnf, $curLD);
+                $curLD = undef;
+            }
+        } else {
+            if ($_ =~ /$RetLDInfoHead/i) {
+                $curLD = {};
+                $curLD->{'drive'} = $1;
+                $curLD->{'target'} = $2;
+            }
+        }
+    }
+    if ($#ldcnf != ($ldnum - 1)) {print "LD number mismatch\n"; }
+    return \@ldcnf;
+}
+
