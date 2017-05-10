@@ -38,7 +38,7 @@ my $ldcnf = &GetLD();
 
 if ($ARGV[0] and $ARGV[0] eq 'config') {
     print <<"__EOF__";
-multigraph megaraid_$cnfAdp.vdstate
+multigraph megaraid_${cnfAdp}_vdstate
 graph_title MegaRAID Adp $cnfAdp Virtual Drive status
 graph_scale no
 graph_vlabel Status
@@ -53,7 +53,7 @@ vd$_->{drive}_state.type GAUGE
 __EOF__
     }
     print <<"__EOF__";
-multigraph megaraid_$cnfAdp.failure
+multigraph megaraid_${cnfAdp}_failure
 graph_title MegaRAID Adp $cnfAdp Physical Drive status
 graph_scale no
 graph_vlabel Failure count
@@ -73,7 +73,7 @@ pd$_->{'slot number'}_smart.warning 1
 __EOF__
     }
     print <<"__EOF__";
-multigraph megaraid_$cnfAdp.pdpos
+multigraph megaraid_${cnfAdp}_pdpos
 graph_title MegaRAID Adp $cnfAdp Physical Drive position
 graph_scale no
 graph_vlabel Position ID
@@ -95,7 +95,7 @@ __EOF__
 # START PRINT
 
 my $cval;
-print "multigraph megaraid_$cnfAdp.vdstate\n";
+print "multigraph megaraid_${cnfAdp}_vdstate\n";
 foreach (@$ldcnf) {
     print "vd$_->{drive}_drives.value $_->{'number of drives'}\n";
     if (defined($valVDState->{$_->{state}})) {$cval = $valVDState->{$_->{state}}; }
@@ -103,7 +103,7 @@ foreach (@$ldcnf) {
     print "vd$_->{drive}_state.value $cval\n";
 }
 
-print "multigraph megaraid_$cnfAdp.failure\n";
+print "multigraph megaraid_${cnfAdp}_failure\n";
 foreach (@$pdcnf) {
     print "pd$_->{'slot number'}_media.value $_->{'media error count'}\n";
     print "pd$_->{'slot number'}_other.value $_->{'other error count'}\n";
@@ -113,7 +113,7 @@ foreach (@$pdcnf) {
     print "pd$_->{'slot number'}_smart.value $cval\n";
 }
 
-print "multigraph megaraid_$cnfAdp.pdpos\n";
+print "multigraph megaraid_${cnfAdp}_pdpos\n";
 foreach (@$pdcnf) {
     $_->{'drive\'s position'} =~ /DiskGroup: ([0-9]+), Span: ([0-9]+), Arm: ([0-9]+)/i;
     print "pd$_->{'slot number'}_group.value $1\n";
