@@ -6,6 +6,9 @@
 # Option
 #   script link with target adapter ID, like megaraid_0
 #   env.clicmd for full path of megacli, normally not required (in PATH)
+#
+# Install megacli from http://hwraid.le-vert.net/debian for debian.
+#
 
 use strict;
 
@@ -28,6 +31,7 @@ my $cnfAdp = 0; # default to 0
 if ($0 =~ /megaraid\_([0-9])$/) {
     $cnfAdp = $1;
 }
+if (defined($ENV{clicmd})) {$CmdMain = $ENV{clicmd}; }
 
 if ($ARGV[0] and $ARGV eq 'autoconf') {
     print 'yes\n';
