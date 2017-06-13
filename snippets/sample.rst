@@ -71,3 +71,25 @@ Tables
 | but   | not   | flexible |
 +-------+-------+----------+
 
+Links
+=====
+
+- normalink_
+- `phrase link`_ 
+- `in place link <http://example.net/>`_
+- Can link to titles without anything like `Links`_
+
+.. _normallink: http://example.net/
+.. _phrase link: http://example.net/
+
+- numbered footnote [5]_
+- auto numbered footnote [#]_
+- auto numbered footnote with name [#named]_
+- citations are possible [PFS2017]_
+
+.. [5] A footnote
+.. [#] Auto numbered footnote
+.. [#named] Named footnote
+.. [PFS2017] Citation
+
+
