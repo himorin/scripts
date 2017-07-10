@@ -5,8 +5,22 @@ head section (h1)
 small head section (h2)
 ******
 
-head section (h3)
+head section (h2)
 ======
+
+head section 3
+------
+
+======
+head section 4
+======
+
+------
+head section 5
+------
+
+head sections
+------
 
 Listing
 ======
