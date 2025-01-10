@@ -49,6 +49,7 @@ text is highlighted if without language definition
 * *italics* or _emphasis_ by * or _
 * **bold** or __strong__ by two * or _
 * ~~strike~~ by two ~
+* `inline code`
 
 ## table
 

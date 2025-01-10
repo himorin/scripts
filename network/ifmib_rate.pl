@@ -55,7 +55,7 @@ foreach $cif (@target_if) {
 }
 &PrintHead();
 # measure routine overhead
-my ($cmst, $cmlen);
+my ($cmst, $cmlen, $cslep);
 $cmst = [gettimeofday];
 $cmlen = ($target_iv - tv_interval($cmst) - $cmlen) * 1000000;
 &PrintLine($cmst, $last_val, $last_val);
@@ -64,7 +64,8 @@ $cmlen = tv_interval($cmst);
 # loop
 while (1) {
     if (defined($ctime)) {
-        usleep(($target_iv - tv_interval($ctime) - $cmlen) * 1000000);
+        $cslep = ($target_iv - tv_interval($ctime) - $cmlen) * 1000000;
+        if ($cslep > 0.0) {usleep($cslep); }
     }
     $ctime = [gettimeofday];
     $c_res = &GetDefValues($session, \@target_if);
