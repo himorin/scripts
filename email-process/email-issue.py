@@ -1,9 +1,11 @@
 #! /usr/bin/env python3
 
+import sys
 from LoadConfig import LoadConfig
 from email.parser import Parser
 from email.policy import default
 from email.message import EmailMessage
+import requests
 
 DEF_SCRIPTNAME = "email-issue"
 
@@ -24,6 +26,21 @@ def ParseEmail(fp):
     ret['body'] = msg.get_payload(decode=True).decode(msg.get_content_charset() or 'utf-8', errors='replace')
   return ret
 
+def OpenIssue(conf, msg):
+  cses = requests.Session()
+  chead = {
+    "Accept": "application/vnd.github+json",
+    "Authorization": "Bearer %s" % (conf['key']),
+    "X-GitHub-Api-Version": "2022-11-28"
+  }
+  cdat = {
+    "title": msg['subject'],
+    "body": "From: %s\nDate: %s\n\n%s" % (msg['from'], msg['date'], msg['body'])
+  }
+  curl = "https://api.github.com/repos/%s/issues" % (conf['target'])
+  ret = cses.post(curl, headers = chead, json = cdat)
+  return ret
+
 if __name__ == "__main__":
   config = LoadConfig()
   cname = sys.argv[0].split('/')[-1]
@@ -33,4 +50,4 @@ if __name__ == "__main__":
   if ctgt not in config:
     raise Exception("config item '%s' not found" % (ctgt))
   ccnf = config[ctgt]
-  ParseEmail(sys.stdin)
+  msg = ParseEmail(sys.stdin)
