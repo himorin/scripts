@@ -51,3 +51,4 @@ if __name__ == "__main__":
     raise Exception("config item '%s' not found" % (ctgt))
   ccnf = config[ctgt]
   msg = ParseEmail(sys.stdin)
+  res = OpenIssue(ccnf, msg)
