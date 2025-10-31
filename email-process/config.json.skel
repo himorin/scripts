@@ -1,0 +1,6 @@
+{
+  "email-issue": {
+    "target": "<repository>",
+    "key": "GitHub fine-grained PAT"
+  }
+}
