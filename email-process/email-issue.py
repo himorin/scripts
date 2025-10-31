@@ -42,8 +42,13 @@ def OpenIssue(conf, msg):
   return ret
 
 if __name__ == "__main__":
-  config = LoadConfig()
-  cname = sys.argv[0].split('/')[-1]
+  caname = sys.argv[0].split('/')
+  if len(caname) != 1:
+    cdir = '/'.join(caname[:-1]) + '/'
+  else:
+    cdir = './'
+  cname = caname[-1]
+  config = LoadConfig(cdir)
   if cname[-3] == '.py':
     cname = cname[0:-3]
   ctgt = DEF_SCRIPTNAME + '-' + cname

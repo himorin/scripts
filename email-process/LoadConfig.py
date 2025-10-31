@@ -3,16 +3,19 @@
 import sys
 import json
 
-DEF_CONF_NAME = "./config.json"
+DEF_CONF_NAME = "config.json"
 
-def LoadConfig():
+def LoadConfig(dir):
+  if dir is None:
+    dir = "./"
+  ccnf = dir + DEF_CONF_NAME
   try:
-    fjson = open(DEF_CONF_NAME, 'r')
+    fjson = open(ccnf, 'r')
   except IOError as e:
-    raise Exception("File '%s' open error: %s" % (DEF_CONF_NAME, e))
+    raise Exception("File '%s' open error: %s" % (ccnf, e))
   try:
     site_config = json.load(fjson)
   except:
-    raise Exception("json format parse error for '%s'" % (DEF_CONF_NAME))
+    raise Exception("json format parse error for '%s'" % (ccnf))
   return site_config
 
