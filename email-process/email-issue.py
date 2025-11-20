@@ -16,7 +16,7 @@ def CheckPart(part):
     return part.get_payload(decode=True).decode(part.get_content_charset() or 'utf-8', errors='replace')
   elif ctype == 'multipart/mixed':
     # dealing with OpenPGP/MIME signed
-    msg_op = Parser(policy=default).parsestr(part.as_bytes(unixfrom=True))
+    msg_op = Parser(policy=default).parsestr(part.as_string(unixfrom=True))
     for part_op in msg_op.iter_parts():
       ret = CheckPart(part_op)
       if ret is not None:
