@@ -9,18 +9,32 @@ import requests
 
 DEF_SCRIPTNAME = "email-issue"
 
+def CheckPart(part):
+  ctype = part.get_content_type()
+  cdispo = str(part.get("Content-Disposition"))
+  if ctype == 'text/plain' and 'attachment' not in cdispo:
+    return part.get_payload(decode=True).decode(part.get_content_charset() or 'utf-8', errors='replace')
+  elif ctype == 'multipart/mixed':
+    # dealing with OpenPGP/MIME signed
+    msg_op = Parser(policy=default).parsebytes(part)
+    for part_op in msg_op.iter_parts():
+      ret = CheckPart(part_op)
+      if ret is not None:
+        return ret
+  return None
+
 def ParseEmail(fp):
   msg = Parser(policy=default).parse(fp)
   ret = {}
   ret['from'] = msg['From']
   ret['date'] = msg['Date']
   ret['subject'] = msg['Subject']
+  ret['body'] = ''
   if msg.is_multipart():
     for part in msg.iter_parts():
-      ctype = part.get_content_type()
-      cdispo = str(part.get("Content-Disposition"))
-      if ctype == 'text/plain' and 'attachment' not in cdispo:
-        ret['body'] = part.get_payload(decode=True).decode(part.get_content_charset() or 'utf-8', errors='replace')
+      retbd = CheckPart(part)
+      if retbd is not None:
+        ret['body'] = retbd
         break
   else:
     ret['body'] = msg.get_payload(decode=True).decode(msg.get_content_charset() or 'utf-8', errors='replace')
